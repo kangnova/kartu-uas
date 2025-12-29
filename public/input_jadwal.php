@@ -1,4 +1,7 @@
 <?php 
+require_once 'auth_check.php';
+checkAdminAuth();
+
 require_once '../config/database.php';
 
 // Handle form submission

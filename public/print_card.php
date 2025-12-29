@@ -26,18 +26,21 @@ if (!$student) {
 $kaprodi_list = [
     'PAI' => [
         'nama' => 'Sulistiono Shalladdin Albany, S.Pd.I, M.Pd.',
-        'nidn' => '2118079103'
+        'nidn' => '2118079103',
+        'ttd'  => 'assets/img/ttd_bani.jpg'
     ],
     'PIAUD' => [
         'nama' => 'Muhammad Syafe’i, M.Pd.',
-        'nidn' => '2111099002'
+        'nidn' => '2111099002',
+        'ttd'  => 'assets/img/ttd_syafei.png'
     ]
 ];
 
 // Determine current Kaprodi
 $current_kaprodi = $kaprodi_list[$student['kode_prodi']] ?? [
     'nama' => '.........................',
-    'nidn' => '.........................'
+    'nidn' => '.........................',
+    'ttd'  => null
 ];
 
 // Get Schedule Data
@@ -136,8 +139,14 @@ $total_sks = 0;
             margin-right: 50px;
             width: 250px;
         }
+        .signature img {
+            width: 100px;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+        }
         .signature-name {
-            margin-top: 60px;
+            margin-top: 10px;
             text-decoration: underline;
             font-weight: bold;
         }
@@ -231,6 +240,12 @@ $total_sks = 0;
                 <p>Klaten, <?= date('d F Y') ?></p>
                 <p>Ketua Prodi <?= $student['nama_prodi'] ?></p>
                 
+                <?php if (!empty($current_kaprodi['ttd'])): ?>
+                    <img src="<?= $current_kaprodi['ttd'] ?>" alt="Tanda Tangan Kaprodi">
+                <?php else: ?>
+                    <br><br><br>
+                <?php endif; ?>
+
                 <div class="signature-name">
                     <?= $current_kaprodi['nama'] ?>
                 </div>
