@@ -22,6 +22,18 @@ if (!$student) {
     die("Mahasiswa tidak ditemukan.");
 }
 
+// Check Finance Status
+if ($student['status_keuangan'] != 'LUNAS' && $student['status_keuangan'] != 'DISPENSASI') {
+    die("
+        <div style='font-family: sans-serif; text-align: center; padding: 50px;'>
+            <h1 style='color: red;'>Akses Ditolak</h1>
+            <p>Maaf, Anda belum menyelesaikan administrasi keuangan atau belum diverifikasi oleh Bendahara.</p>
+            <p>Status Anda saat ini: <strong>" . str_replace('_', ' ', $student['status_keuangan']) . "</strong></p>
+            <p>Silakan hubungi bagian keuangan/Bendahara.</p>
+        </div>
+    ");
+}
+
 // Kaprodi Data
 $kaprodi_list = [
     'PAI' => [

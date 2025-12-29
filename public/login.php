@@ -7,9 +7,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
 
-    // Hardcoded credentials for simplicity as requested/implied context
+    // Hardcoded credentials
     if ($username === 'admin' && $password === 'admin123') {
-        $_SESSION['is_admin'] = true;
+        $_SESSION['is_loggedin'] = true;
+        $_SESSION['role'] = 'admin';
+        $_SESSION['is_admin'] = true; // Backward compatibility
+        header("Location: index.php");
+        exit;
+    } elseif ($username === 'bendahara' && $password === 'bendahara123') {
+        $_SESSION['is_loggedin'] = true;
+        $_SESSION['role'] = 'bendahara';
         header("Location: index.php");
         exit;
     } else {

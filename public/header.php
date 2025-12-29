@@ -26,8 +26,11 @@ $is_admin = $_SESSION['is_admin'] ?? false;
                     <a href="input_mahasiswa.php" class="hover:text-blue-200">Input Mahasiswa</a>
                     <a href="cetak_kartu.php" class="hover:text-blue-200">Cetak (Admin)</a>
                     <a href="logout.php" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm transition">Logout</a>
+                <?php elseif (isset($_SESSION['role']) && $_SESSION['role'] == 'bendahara'): ?>
+                    <a href="verifikasi_keuangan.php" class="hover:text-blue-200 font-bold">Verifikasi Keuangan</a>
+                    <a href="logout.php" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm transition">Logout</a>
                 <?php else: ?>
-                    <a href="login.php" class="bg-white text-blue-800 px-3 py-1 rounded text-sm font-bold hover:bg-gray-100 transition">Login Admin</a>
+                    <a href="login.php" class="bg-white text-blue-800 px-3 py-1 rounded text-sm font-bold hover:bg-gray-100 transition">Login Admin/Bendahara</a>
                 <?php endif; ?>
             </div>
         </div>

@@ -50,10 +50,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->close();
     }
 
-    // Redirect to print card
+    // Redirect logic based on Status
     if ($student_id) {
-        header("Location: print_card.php?id=" . $student_id);
-        exit;
+        // Fetch current status
+        $check_status = $conn->query("SELECT status_keuangan FROM mahasiswa WHERE id = $student_id")->fetch_assoc();
+        $status = $check_status['status_keuangan'];
+
+        if ($status == 'LUNAS' || $status == 'DISPENSASI') {
+            header("Location: print_card.php?id=" . $student_id);
+            exit;
+        } else {
+            $message = "
+            <div class='bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4'>
+                <strong>Data Berhasil Disimpan!</strong><br>
+                Namun Anda belum dapat mencetak kartu karena status keuangan Anda: <strong>" . str_replace('_', ' ', $status) . "</strong>.<br>
+                Silakan hubungi Bendahara untuk verifikasi pembayaran.
+            </div>";
+        }
     }
 }
 
