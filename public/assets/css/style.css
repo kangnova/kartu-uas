@@ -1,0 +1,18 @@
+/* Main Stylesheet */
+
+/* Responsive Table for Mobile (if needed) */
+@media (max-width: 640px) {
+    .table-responsive {
+        overflow-x: auto;
+    }
+}
+
+/* Print specific overrides if needed */
+@media print {
+    body {
+        background-color: white;
+    }
+    nav, .no-print {
+        display: none !important;
+    }
+}
