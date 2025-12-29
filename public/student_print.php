@@ -9,8 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nama = strtoupper($_POST['nama']); // Ensure uppercase
     $nim = $_POST['nim'];
 
-    // Check if Student Exists
-    $check = $conn->prepare("SELECT id FROM mahasiswa WHERE nim = ?");
+    // Check if Student Exists (NIM)
+    $check = $conn->prepare("SELECT id, nama FROM mahasiswa WHERE nim = ?");
     $check->bind_param("s", $nim);
     $check->execute();
     $result = $check->get_result();
@@ -20,14 +20,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $student_id = null;
 
     if ($existing_student) {
-        // Update existing student data (in case semester changed)
-        $student_id = $existing_student['id'];
-        $stmt = $conn->prepare("UPDATE mahasiswa SET prodi_id = ?, semester = ?, nama = ? WHERE id = ?");
-        $stmt->bind_param("iisi", $prodi_id, $semester, $nama, $student_id);
-        if (!$stmt->execute()) {
-             die("Error updating data: " . $stmt->error);
+        // If Name and NIM match, don't save/update, just print
+        if (strtoupper($existing_student['nama']) === $nama) {
+            $student_id = $existing_student['id'];
+            // SKIP UPDATE
+        } else {
+            // NIM exists but Name differs (or same name different case/formatting, though strtoupper handles case)
+            // Perform Update (e.g. correcting name typo, or updating info)
+            // NOTE: If user intends to prevent ANY update if NIM exists, this else block should be removed or changed.
+            // Assuming we still want to allow updates if names don't match (e.g. correction).
+            $student_id = $existing_student['id'];
+            $stmt = $conn->prepare("UPDATE mahasiswa SET prodi_id = ?, semester = ?, nama = ? WHERE id = ?");
+            $stmt->bind_param("iisi", $prodi_id, $semester, $nama, $student_id);
+            if (!$stmt->execute()) {
+                 die("Error updating data: " . $stmt->error);
+            }
+            $stmt->close();
         }
-        $stmt->close();
     } else {
         // Insert new student
         $stmt = $conn->prepare("INSERT INTO mahasiswa (prodi_id, semester, nama, nim) VALUES (?, ?, ?, ?)");
