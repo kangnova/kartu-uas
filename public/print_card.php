@@ -64,7 +64,7 @@ $stmt_jadwal = $conn->prepare("
 $stmt_jadwal->bind_param("ii", $student['prodi_id'], $student['semester']);
 $stmt_jadwal->execute();
 $jadwal = $stmt_jadwal->get_result();
-$total_sks = 0;
+
 ?>
 
 <!DOCTYPE html>
@@ -213,10 +213,10 @@ $total_sks = 0;
             <thead>
                 <tr>
                     <th width="30">No</th>
-                    <th width="80">Kode</th>
+                    <th width="100">Tanggal</th>
                     <th>NAMA MATA KULIAH</th>
                     <th width="100">Presensi</th>
-                    <th width="40">SKS</th>
+                    <th width="80">Waktu</th>
                     <th width="100">PARAF DOSEN</th>
                 </tr>
             </thead>
@@ -224,22 +224,19 @@ $total_sks = 0;
                 <?php 
                 $no = 1;
                 while($row = $jadwal->fetch_assoc()): 
-                    $total_sks += $row['sks'];
+                    $timestamp = strtotime($row['waktu']);
+                    $tanggal = date('d-m-Y', $timestamp);
+                    $jam = date('H:i', $timestamp);
                 ?>
                 <tr>
                     <td class="text-center"><?= $no++ ?></td>
-                    <td class="text-center"><?= $row['kode_matkul'] ?></td>
+                    <td class="text-center"><?= $tanggal ?></td>
                     <td><?= $row['nama_matkul'] ?></td>
                     <td class="text-center">Memenuhi</td>
-                    <td class="text-center"><?= $row['sks'] ?></td>
+                    <td class="text-center"><?= $jam ?> WIB</td>
                     <td></td>
                 </tr>
                 <?php endwhile; ?>
-                <tr>
-                    <td colspan="4" style="text-align: right; font-weight: bold; border: none; padding-right: 15px;"></td>
-                    <td class="text-center" style="font-weight: bold;"><?= $total_sks ?></td>
-                    <td style="border: none;"></td>
-                </tr>
             </tbody>
         </table>
 
