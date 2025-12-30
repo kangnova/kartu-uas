@@ -67,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $namaMatkul = trim($data[3]);
                         $sks = (int)$data[4];
                         $waktuRaw = trim($data[5]);
+                        $pengawas = isset($data[6]) ? trim($data[6]) : ''; // Column 7: Pengawas
 
                         // Handle Date Format (d/m/Y H:i usually from Excel ID region)
                         $waktuObj = DateTime::createFromFormat('d/m/Y H:i', $waktuRaw);
@@ -96,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                         $prodiId = $prodiMap[$kodeProdi];
 
-                        $stmt = $conn->prepare("INSERT INTO jadwal_uas (prodi_id, semester, kode_matkul, nama_matkul, sks, waktu) VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt->bind_param("isssss", $prodiId, $semester, $kodeMatkul, $namaMatkul, $sks, $waktu);
+                        $stmt = $conn->prepare("INSERT INTO jadwal_uas (prodi_id, semester, kode_matkul, nama_matkul, sks, waktu, pengawas) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $stmt->bind_param("issssss", $prodiId, $semester, $kodeMatkul, $namaMatkul, $sks, $waktu, $pengawas);
                         
                         if ($stmt->execute()) {
                             $success++;
@@ -131,9 +132,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $nama_matkul = $_POST['nama_matkul'];
         $sks = $_POST['sks'];
         $waktu = $_POST['waktu'];
+        $pengawas = $_POST['pengawas'];
 
-        $stmt = $conn->prepare("INSERT INTO jadwal_uas (prodi_id, semester, kode_matkul, nama_matkul, sks, waktu) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("isssss", $prodi_id, $semester, $kode_matkul, $nama_matkul, $sks, $waktu);
+        $stmt = $conn->prepare("INSERT INTO jadwal_uas (prodi_id, semester, kode_matkul, nama_matkul, sks, waktu, pengawas) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("issssss", $prodi_id, $semester, $kode_matkul, $nama_matkul, $sks, $waktu, $pengawas);
 
         if ($stmt->execute()) {
             $message = "<div class='bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4'>Data berhasil disimpan!</div>";
@@ -226,6 +228,11 @@ try {
         <div>
             <label class="block text-gray-700 font-bold mb-2">Nama Matakuliah</label>
             <input type="text" name="nama_matkul" required class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
+        </div>
+
+        <div>
+            <label class="block text-gray-700 font-bold mb-2">Pengawas</label>
+            <input type="text" name="pengawas" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500" placeholder="Nama Pengawas">
         </div>
 
         <div>

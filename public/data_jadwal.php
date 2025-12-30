@@ -69,11 +69,17 @@ $prodis = $conn->query("SELECT * FROM prodi");
             </select>
             
             <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Filter</button>
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Filter</button>
             <?php if ($filter_prodi): ?>
-                <a href="export_jadwal_html.php?prodi=<?= $filter_prodi ?>" target="_blank" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-2">
+                <a href="export_jadwal_html.php?prodi=<?= $filter_prodi ?>" target="_blank" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-2" title="Export HTML Matriks">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2.5 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm7 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm-9-9h.01"></path></svg>
                     Export Matrix
                 </a>
+            <?php else: ?>
+                <button type="button" onclick="alert('Silahkan pilih filter Prodi terlebih dahulu untuk melakukan Export.')" class="bg-gray-400 text-white px-4 py-2 rounded flex items-center gap-2 cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2.5 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm7 0a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm-9-9h.01"></path></svg>
+                    Export Matrix
+                </button>
             <?php endif; ?>
             <a href="data_jadwal.php" class="text-gray-500 hover:text-gray-700 ml-2">Reset</a>
         </form>
@@ -89,6 +95,7 @@ $prodis = $conn->query("SELECT * FROM prodi");
                     <th class="p-3 border-b">Kode MK</th>
                     <th class="p-3 border-b">Mata Kuliah</th>
                     <th class="p-3 border-b">SKS</th>
+                    <th class="p-3 border-b">Pengawas</th>
                     <th class="p-3 border-b">Prodi</th>
                     <th class="p-3 border-b">Sem</th>
                 </tr>
@@ -111,6 +118,7 @@ $prodis = $conn->query("SELECT * FROM prodi");
                         <td class="p-3 text-sm text-gray-500"><?= htmlspecialchars($row['kode_matkul']) ?></td>
                         <td class="p-3 font-bold text-gray-700"><?= htmlspecialchars($row['nama_matkul']) ?></td>
                         <td class="p-3"><?= $row['sks'] ?></td>
+                        <td class="p-3 text-sm text-gray-600"><?= htmlspecialchars($row['pengawas'] ?? '-') ?></td>
                         <td class="p-3 text-sm">
                             <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs">
                                 <?= $row['nama_prodi'] ?>

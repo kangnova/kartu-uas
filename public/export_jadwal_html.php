@@ -11,42 +11,63 @@ if (!$prodi_id) {
 // Fetch Prodi Name
 $pRow = $conn->query("SELECT nama_prodi FROM prodi WHERE id = $prodi_id")->fetch_assoc();
 $nama_prodi = $pRow['nama_prodi'];
+$_SESSION['prodi_name'] = $nama_prodi; // For PDF filename etc if needed
 
-// Fetch Schedules
+// Fetch Schedules (Ordered by Time, then Semester)
 $sql = "SELECT * FROM jadwal_uas WHERE prodi_id = ? ORDER BY waktu ASC, semester ASC";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $prodi_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
-$jadwal = [];
+$data = [];
 $semesters = [];
-$times = [];
+$dates = [];
 
 while ($row = $result->fetch_assoc()) {
-    $waktu = substr($row['waktu'], 0, 16); // Y-m-d H:i
+    $timeFull = $row['waktu'];
+    $dateOnly = date('Y-m-d', strtotime($timeFull));
+    $timeOnly = date('H:i', strtotime($timeFull)); // 14:00
+    
+    // Normalize Semester (in case mixed case)
     $sem = strtoupper($row['semester']);
+    if (!in_array($sem, $semesters)) $semesters[] = $sem;
+
+    // Structure: Date -> Time -> Semester -> Data
+    $data[$dateOnly][$timeOnly][$sem] = $row;
     
-    $jadwal[$waktu][$sem] = $row;
-    
-    if (!in_array($sem, $semesters)) {
-        $semesters[] = $sem;
-    }
-    
-    if (!in_array($waktu, $times)) {
-        $times[] = $waktu;
-    }
+    // Keep track of dates and times for iteration
+    if (!isset($dates[$dateOnly])) $dates[$dateOnly] = [];
+    if (!in_array($timeOnly, $dates[$dateOnly])) $dates[$dateOnly][] = $timeOnly;
 }
 
-// Sort Semesters (Numeric then String)
+// Sort Semesters Naturally (I, II, ... 7, 7 Non Reg)
 usort($semesters, function($a, $b) {
     return strnatcmp($a, $b);
 });
 
-// Sort Times
-sort($times);
+$daysIndo = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+$monthsIndo = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-$days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+function formatTanggalIndo($dateStr, $days, $months) {
+    $ts = strtotime($dateStr);
+    $dayName = $days[date('w', $ts)];
+    $d = date('j', $ts);
+    $m = $months[(int)date('n', $ts)];
+    $y = date('Y', $ts);
+    return "$dayName, $d<br>$m<br>$y";
+}
+
+// Mapping Jam Ke (Logic based on start time approximation)
+function getJamKe($time) {
+    // Example logic based on standard UAS slots
+    if ($time >= '08:00' && $time < '09:30') return 1;
+    if ($time >= '09:45' && $time < '11:15') return 2;
+    if ($time >= '13:00' && $time < '14:30') return 1; // Afternoon session restart? or continue?
+    // Let's use simple counter per day for now as per image '1', '2'
+    return 1; 
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -54,84 +75,103 @@ $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     <meta charset="UTF-8">
     <title>Jadwal UAS - <?= htmlspecialchars($nama_prodi) ?></title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid black; padding: 5px; text-align: center; vertical-align: top; }
-        th { background-color: #f0f0f0; }
-        .date-col { width: 120px; font-weight: bold; }
-        .time-col { width: 100px; }
-        .matkul-name { font-weight: bold; font-size: 13px; margin-bottom: 4px; }
-        .matkul-code { font-size: 11px; margin-bottom: 2px; }
-        .pengawas-row { background-color: #fafafa; height: 30px; }
-        .print-btn { margin-bottom: 20px; padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 4px; }
-        @media print { .print-btn { display: none; } }
+        @page { size: A4 landscape; margin: 10mm; }
+        body { font-family: Arial, sans-serif; font-size: 11px; }
+        h2 { margin: 5px 0 15px 0; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; border: 2px solid #000; }
+        th, td { border: 1px solid #000; padding: 4px; text-align: center; vertical-align: middle; }
+        th { background-color: #ffffff; font-weight: bold; height: 30px; }
+        .date-col { width: 100px; font-weight: bold; background-color: #fff; }
+        .jam-col { width: 30px; font-weight: bold; }
+        .waktu-col { width: 100px; }
+        .matkul-cell { height: 50px; }
+        .matkul-name { font-weight: bold; font-size: 12px; }
+        .matkul-code { font-size: 10px; margin-top: 2px; font-weight: bold; }
+        .sks-code { font-size: 10px; margin-top: 2px; }
+        .pengawas-row td { background-color: #fcfcfc; height: 25px; font-style: italic; }
+        .print-cls { margin-bottom: 10px; }
+        @media print { .print-cls { display: none; } }
     </style>
 </head>
 <body>
-    <button onclick="window.print()" class="print-btn">Cetak / Save PDF</button>
+    <div class="print-cls">
+         <button onclick="window.print()" style="padding: 10px 20px; font-weight: bold;">Cetak Jadwal</button>
+    </div>
 
-    <h2 style="text-align: center;">JADWAL UJIAN AKHIR SEMESTER (UAS)<br><?= htmlspecialchars($nama_prodi) ?></h2>
+    <center>
+        <h2>JADWAL UJIAN AKHIR SEMESTER (UAS) GANJIL T.A 2024/2025<br>FAKULTAS AGAMA ISLAM<br>PRODI <?= strtoupper($nama_prodi) ?></h2>
+    </center>
 
     <table>
         <thead>
             <tr>
-                <th>HARI/TANGGAL</th>
-                <th>JAM</th>
-                <th>WAKTU</th>
+                <th rowspan="2">HARI / TANGGAL</th>
+                <th rowspan="2">JAM</th>
+                <th rowspan="2">WAKTU</th>
+                <th colspan="<?= count($semesters) ?>">SEMESTER</th>
+            </tr>
+            <tr>
                 <?php foreach ($semesters as $sem): ?>
-                    <th>SEMESTER <?= $sem ?></th>
+                    <th><?= $sem ?></th>
                 <?php endforeach; ?>
             </tr>
         </thead>
         <tbody>
-            <?php 
-            $currentDate = '';
-            foreach ($times as $timeStr): 
-                $dateObj = new DateTime($timeStr);
-                $dateOnly = $dateObj->format('Y-m-d');
-                $dayName = $days[$dateObj->format('w')];
-                $formattedDate = $dayName . ', ' . $dateObj->format('d M Y');
-                
-                $jamKe = ''; // Logic jam ke (manual logic or based on time)
-                $jamStart = $dateObj->format('H.i');
-                // Calculate end time (assuming 90 mins for 2 SKS generally, or just show start)
-                // For simplicity showing Raw Time Range if possible or just Start
-                
-                // Grouping by Date for Rowspan logic could be complex purely in loop. 
-                // Simplified: Repeat date or handle logic visually.
-                // Required image style: Date on left merged. 
+            <?php foreach ($dates as $date => $times): 
+                // Calculate RowSpan: (Number of times * 2) because each time has a data row AND a pengawas row
+                $rowSpan = count($times) * 2; 
+                $datePrinted = false;
+                $jamCounter = 1;
             ?>
-            <tr>
-                <td class="date-col">
-                    <?php if ($currentDate != $dateOnly): ?>
-                        <?= $formattedDate ?>
-                        <?php $currentDate = $dateOnly; ?>
-                    <?php endif; ?>
-                </td>
-                <td><!-- Jam Ke logic needed? Use counter or mapping --></td>
-                <td><?= $jamStart ?> WIB</td>
-                
-                <?php foreach ($semesters as $sem): ?>
-                    <td>
-                        <?php if (isset($jadwal[$timeStr][$sem])): 
-                            $j = $jadwal[$timeStr][$sem];
-                        ?>
-                            <div class="matkul-name"><?= $j['nama_matkul'] ?></div>
-                            <div class="matkul-code"><?= $j['kode_matkul'] ?></div>
-                            <div><?= $j['sks'] ?> SKS</div>
+                <?php foreach ($times as $time): 
+                     // Calculate End Time (Start + 90 mins usually, or check layout)
+                     // Example: 14.00 - 15.30
+                     $endTime = date('H.i', strtotime($time) + (90 * 60)); 
+                     $range = date('H.i', strtotime($time)) . " - " . $endTime;
+                ?>
+                    <!-- Data Row -->
+                    <tr>
+                        <?php if (!$datePrinted): ?>
+                            <td rowspan="<?= $rowSpan ?>" class="date-col">
+                                <?= formatTanggalIndo($date, $daysIndo, $monthsIndo) ?>
+                            </td>
+                            <?php $datePrinted = true; ?>
                         <?php endif; ?>
-                    </td>
+                        
+                        <td class="jam-col"><?= $jamCounter++ ?></td>
+                        <td class="waktu-col"><?= $range ?></td>
+                        
+                        <?php foreach ($semesters as $sem): ?>
+                            <td class="matkul-cell">
+                                <?php if (isset($data[$date][$time][$sem])): 
+                                    $row = $data[$date][$time][$sem];
+                                ?>
+                                    <div class="matkul-cell-content">
+                                        <div class="matkul-name"><?= $row['nama_matkul'] ?></div>
+                                        <div class="matkul-code"><?= $row['kode_matkul'] ?></div>
+                                        <!-- Placeholder for Class Code if exists, e.g. F & 4 -->
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
+                    <!-- Pengawas Row -->
+                    <tr class="pengawas-row">
+                        <!-- Date col is spanned -->
+                        <td colspan="2"><strong>Pengawas</strong></td>
+                        <?php foreach ($semesters as $sem): ?>
+                            <td>
+                                <?php if (isset($data[$date][$time][$sem])): 
+                                    $row = $data[$date][$time][$sem];
+                                ?>
+                                    <span style="font-size: 11px;"><?= htmlspecialchars($row['pengawas'] ?? '') ?></span>
+                                <?php endif; ?>
+                            </td>
+                        <?php endforeach; ?>
+                    </tr>
+
                 <?php endforeach; ?>
-            </tr>
-            <!-- Pengawas Row Placeholder matching image style -->
-            <tr class="pengawas-row">
-                <td></td>
-                <td></td>
-                <td><strong>Pengawas</strong></td>
-                 <?php foreach ($semesters as $sem): ?>
-                    <td></td>
-                <?php endforeach; ?>
-            </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
