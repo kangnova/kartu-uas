@@ -23,6 +23,7 @@ $is_admin = $_SESSION['is_admin'] ?? false;
                 
                 <?php if ($is_admin): ?>
                     <a href="input_jadwal.php" class="hover:text-blue-200">Input Jadwal</a>
+                    <a href="data_jadwal.php" class="hover:text-blue-200">Data Jadwal</a>
                     <a href="input_mahasiswa.php" class="hover:text-blue-200">Input Mahasiswa</a>
                     <a href="cetak_kartu.php" class="hover:text-blue-200">Cetak (Admin)</a>
                     <a href="logout.php" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded text-sm transition">Logout</a>
