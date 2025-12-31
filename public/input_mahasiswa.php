@@ -40,7 +40,7 @@ if (isset($_POST['import_csv'])) {
             $nim = trim($data[0] ?? '');
             $nama = strtoupper(trim($data[1] ?? ''));
             $kode_prodi = trim($data[2] ?? '');
-            $semester = (int)($data[3] ?? 1);
+            $semester = trim($data[3] ?? '');
             $status = strtoupper(trim($data[4] ?? 'BELUM_LUNAS'));
             $catatan = trim($data[5] ?? '');
 
@@ -66,7 +66,7 @@ if (isset($_POST['import_csv'])) {
             // Updated to utilize all columns shown in user's image, including catatan_keuangan
             $stmt = $conn->prepare("INSERT INTO mahasiswa (nim, nama, prodi_id, semester, status_keuangan, catatan_keuangan) VALUES (?, ?, ?, ?, ?, ?) 
                                     ON DUPLICATE KEY UPDATE nama=VALUES(nama), prodi_id=VALUES(prodi_id), semester=VALUES(semester), status_keuangan=VALUES(status_keuangan), catatan_keuangan=VALUES(catatan_keuangan)");
-            $stmt->bind_param("ssiiss", $nim, $nama, $prodi_id, $semester, $status, $catatan);
+            $stmt->bind_param("ssisss", $nim, $nama, $prodi_id, $semester, $status, $catatan);
             
             if ($stmt->execute()) {
                 $success++;
@@ -108,7 +108,7 @@ if (isset($_POST['submit_manual'])) {
         $message = "<div class='bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4'>NIM sudah terdaftar!</div>";
     } else {
         $stmt = $conn->prepare("INSERT INTO mahasiswa (prodi_id, semester, nama, nim) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("iiss", $prodi_id, $semester, $nama, $nim);
+        $stmt->bind_param("isss", $prodi_id, $semester, $nama, $nim);
 
         if ($stmt->execute()) {
             $message = "<div class='bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4'>Data Mahasiswa berhasil disimpan!</div>";
@@ -179,7 +179,7 @@ try {
 
         <div>
             <label class="block text-gray-700 font-bold mb-2">Semester</label>
-            <input type="number" name="semester" min="1" max="14" required class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
+            <input type="text" name="semester" required class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
         </div>
 
         <div>
