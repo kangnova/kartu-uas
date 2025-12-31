@@ -1,4 +1,7 @@
-<?php include 'header.php'; ?>
+<?php 
+require_once '../config/database.php';
+include 'header.php'; 
+?>
 
 <div class="bg-white p-8 rounded-lg shadow-md text-center">
     <h1 class="text-3xl font-bold text-gray-800 mb-4">Selamat Datang di Sistem Informasi Kartu UAS</h1>
@@ -8,9 +11,19 @@
         <!-- Student Card - Always Visible -->
         <a href="student_print.php"
             class="block p-6 bg-yellow-50 border border-yellow-200 rounded-lg hover:bg-yellow-100 transition">
-            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Mahasiswa: Cetak Mandiri</h3>
-            <p class="text-gray-600">Input data diri dan cetak kartu ujian secara mandiri.</p>
+            <h3 class="text-lg font-semibold text-yellow-800 mb-2">Mahasiswa: Input & Cetak</h3>
+            <p class="text-gray-600">Input data diri baru dan cetak kartu ujian (Untuk mahasiswa yang belum terdaftar).</p>
         </a>
+
+        <!-- Quick Print Card (New Request) -->
+        <div class="block p-6 bg-teal-50 border border-teal-200 rounded-lg">
+            <h3 class="text-lg font-semibold text-teal-800 mb-2">Mahasiswa: Cari & Cetak</h3>
+            <p class="text-gray-600 text-sm mb-4">Masukkan Nama / NIM untuk mencetak kartu (Khusus Lunas / Dispensasi).</p>
+            <form action="" method="GET" class="flex gap-2">
+                <input type="text" name="q" placeholder="Nama / NIM..." class="border border-gray-300 rounded px-2 py-1 w-full text-sm focus:outline-none focus:border-teal-500">
+                <button type="submit" class="bg-teal-600 text-white px-3 py-1 rounded hover:bg-teal-700 text-sm">Cari</button>
+            </form>
+        </div>
 
         <?php if (isset($is_admin) && $is_admin): ?>
             <a href="input_jadwal.php"
@@ -32,20 +45,61 @@
             </a>
         <?php endif; ?>
     </div>
+    
+    <!-- Search Results / Processing (Handling Quick Search) -->
+    <?php
+    if (isset($_GET['q'])) {
+        $search = $conn->real_escape_string($_GET['q']);
+        $sql_search = "SELECT id, nama, nim, status_keuangan FROM mahasiswa WHERE nama LIKE '%$search%' OR nim LIKE '%$search%'";
+        $res_search = $conn->query($sql_search);
+        
+        echo "<div class='mt-8 text-left max-w-4xl mx-auto'>";
+        echo "<h3 class='text-xl font-bold text-gray-800 mb-4'>Hasil Pencarian: " . htmlspecialchars($_GET['q']) . "</h3>";
+        
+        if ($res_search->num_rows > 0) {
+            echo "<div class='bg-white rounded shadow p-4 space-y-2'>";
+            while ($s = $res_search->fetch_assoc()) {
+                $status = $s['status_keuangan'];
+                $can_print = ($status == 'LUNAS' || $status == 'DISPENSASI');
+                $status_color = $can_print ? 'text-green-600' : 'text-red-600';
+                $status_label = str_replace('_', ' ', $status);
+                
+                echo "<div class='flex justify-between items-center border-b last:border-0 pb-2 last:pb-0'>";
+                echo "<div>";
+                echo "<div class='font-bold'>{$s['nama']}</div>";
+                echo "<div class='text-sm text-gray-600'>{$s['nim']} - <span class='$status_color font-bold'>$status_label</span></div>";
+                echo "</div>";
+                
+                if ($can_print) {
+                    echo "<a href='print_card.php?id={$s['id']}' class='bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 text-sm'>Cetak Kartu</a>";
+                } else {
+                     echo "<span class='text-xs bg-gray-200 text-gray-500 px-2 py-1 rounded'>Belum Lunas</span>";
+                }
+                echo "</div>";
+            }
+            echo "</div>";
+        } else {
+             echo "<div class='bg-red-50 text-red-700 p-4 rounded'>Data mahasiswa tidak ditemukan. Silakan <a href='student_print.php' class='underline font-bold'>Input Manual</a> jika belum terdaftar.</div>";
+        }
+        echo "</div>";
+    }
+    ?>
 
     <!-- List of Eligible Students -->
     <div class="mt-12 text-left">
         <h3 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Daftar Mahasiswa Siap Cetak Kartu</h3>
         
         <?php
-        require_once '../config/database.php';
-        
         $sql_eligible = "SELECT m.id, m.nama, m.nim, p.nama_prodi, m.semester, m.status_keuangan 
                          FROM mahasiswa m 
                          JOIN prodi p ON m.prodi_id = p.id 
                          WHERE m.status_keuangan IN ('LUNAS', 'DISPENSASI')
                          ORDER BY p.nama_prodi, m.semester, m.nama";
         $result_eligible = $conn->query($sql_eligible);
+        
+        // Define access rights
+        $user_role = $_SESSION['role'] ?? ''; 
+        $access_action = ($is_admin || $user_role == 'bendahara');
         ?>
 
         <div class="overflow-x-auto bg-white rounded-lg shadow">
@@ -67,9 +121,11 @@
                         <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Semester
                         </th>
+                        <?php if ($access_action): ?>
                         <th class="px-5 py-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                             Aksi
                         </th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
@@ -91,6 +147,7 @@
                                 <td class="px-5 py-5 border-b border-gray-200 text-sm text-gray-500">
                                     <?= htmlspecialchars($row['semester']) ?>
                                 </td>
+                                <?php if ($access_action): ?>
                                 <td class="px-5 py-5 border-b border-gray-200 text-sm">
                                     <a href="print_card.php?id=<?= $row['id'] ?>" target="_blank" class="inline-block bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition text-sm font-semibold shadow-sm">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 inline-block mr-1">
@@ -99,11 +156,12 @@
                                         Cetak Kartu
                                     </a>
                                 </td>
+                                <?php endif; ?>
                             </tr>
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="6" class="px-5 py-5 border-b border-gray-200 text-sm text-center text-gray-500">
+                            <td colspan="<?php echo $access_action ? '6' : '5'; ?>" class="px-5 py-5 border-b border-gray-200 text-sm text-center text-gray-500">
                                 Belum ada mahasiswa yang terdaftar LUNAS / DISPENSASI.
                             </td>
                         </tr>

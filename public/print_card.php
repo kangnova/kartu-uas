@@ -56,14 +56,31 @@ $current_kaprodi = $kaprodi_list[$student['kode_prodi']] ?? [
 ];
 
 // Get Schedule Data
-$stmt_jadwal = $conn->prepare("
-    SELECT * FROM jadwal_uas 
-    WHERE prodi_id = ? AND semester = ?
-    ORDER BY waktu ASC
+// Get Schedule Data
+// 1. Check for Manual Schedule in Database
+$manual_schedule = $conn->query("
+    SELECT j.* 
+    FROM mahasiswa_jadwal mj 
+    JOIN jadwal_uas j ON mj.jadwal_id = j.id 
+    WHERE mj.mahasiswa_id = $id
+    ORDER BY j.waktu ASC
 ");
-$stmt_jadwal->bind_param("ii", $student['prodi_id'], $student['semester']);
-$stmt_jadwal->execute();
-$jadwal = $stmt_jadwal->get_result();
+
+if ($manual_schedule->num_rows > 0) {
+    // Mode Manual: Use saved schedule
+    $jadwal = $manual_schedule;
+} else {
+    // Mode Automatic: Use Prodi & Semester
+    $stmt_jadwal = $conn->prepare("
+        SELECT * FROM jadwal_uas 
+        WHERE prodi_id = ? AND semester = ?
+        ORDER BY waktu ASC
+    ");
+    // Bind param: Prodi=Int, Semester=String
+    $stmt_jadwal->bind_param("is", $student['prodi_id'], $student['semester']);
+    $stmt_jadwal->execute();
+    $jadwal = $stmt_jadwal->get_result();
+}
 
 ?>
 

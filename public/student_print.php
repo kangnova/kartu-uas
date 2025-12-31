@@ -1,6 +1,47 @@
 <?php 
 require_once '../config/database.php';
 
+// Handle AJAX Request for Schedules
+if (isset($_GET['action']) && $_GET['action'] == 'get_schedules') {
+    $prodi_id = $_GET['prodi_id'] ?? '';
+    // Optional: filter by semester if needed, but user might want to pick across semesters?
+    // User said "mengisi jadwalnya sendiri dengan opsi pada jadwal yang sudah ditentukan".
+    // Usually a student is in one semester, but manual entry might imply irregularities.
+    // Let's allow filtering by semester if provided, otherwise show all for prodi? 
+    // Or simpler: Show all for Prodi, grouped by Semester?
+    // Let's filter by semester if provided in the dropdown, but maybe load all if semester not selected?
+    // Actually, the form flow usually is: Select Prodi -> options update?
+    // Or Select Prodi -> Select Semester -> options update?
+    // Let's bind to change of both.
+    
+    $semester = $_GET['semester'] ?? '';
+    
+    $query = "SELECT * FROM jadwal_uas WHERE prodi_id = ?";
+    $params = ["i", $prodi_id];
+    
+    if (!empty($semester)) {
+        $query .= " AND semester = ?";
+        $params[0] .= "s";
+        $params[] = $semester;
+    }
+    
+    $query .= " ORDER BY semester ASC, waktu ASC";
+    
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param(...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $schedules = [];
+    while ($row = $result->fetch_assoc()) {
+        $schedules[] = $row;
+    }
+    
+    header('Content-Type: application/json');
+    echo json_encode($schedules);
+    exit;
+}
+
 // Handle form submission
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -8,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $semester = $_POST['semester'];
     $nama = strtoupper($_POST['nama']); // Ensure uppercase
     $nim = $_POST['nim'];
+    $jadwal_ids = $_POST['jadwal_ids'] ?? [];
 
     // Check if Student Exists (NIM)
     $check = $conn->prepare("SELECT id, nama FROM mahasiswa WHERE nim = ?");
@@ -25,13 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $student_id = $existing_student['id'];
             // SKIP UPDATE
         } else {
-            // NIM exists but Name differs (or same name different case/formatting, though strtoupper handles case)
-            // Perform Update (e.g. correcting name typo, or updating info)
-            // NOTE: If user intends to prevent ANY update if NIM exists, this else block should be removed or changed.
-            // Assuming we still want to allow updates if names don't match (e.g. correction).
+            // NIM exists but Name differs
             $student_id = $existing_student['id'];
             $stmt = $conn->prepare("UPDATE mahasiswa SET prodi_id = ?, semester = ?, nama = ? WHERE id = ?");
-            $stmt->bind_param("iisi", $prodi_id, $semester, $nama, $student_id);
+            $stmt->bind_param("issi", $prodi_id, $semester, $nama, $student_id);
             if (!$stmt->execute()) {
                  die("Error updating data: " . $stmt->error);
             }
@@ -40,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         // Insert new student
         $stmt = $conn->prepare("INSERT INTO mahasiswa (prodi_id, semester, nama, nim) VALUES (?, ?, ?, ?)");
-        $stmt->bind_param("iiss", $prodi_id, $semester, $nama, $nim);
+        $stmt->bind_param("isss", $prodi_id, $semester, $nama, $nim);
         
         if ($stmt->execute()) {
             $student_id = $conn->insert_id;
@@ -52,11 +91,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Redirect logic based on Status
     if ($student_id) {
+        // Handle Schedule Persistence
+        if (!empty($jadwal_ids)) {
+            // 1. Clear existing manual schedule for this student (to allow updates/changes)
+            $conn->query("DELETE FROM mahasiswa_jadwal WHERE mahasiswa_id = $student_id");
+
+            // 2. Insert new selections
+            $stmt_insert = $conn->prepare("INSERT INTO mahasiswa_jadwal (mahasiswa_id, jadwal_id) VALUES (?, ?)");
+            foreach ($jadwal_ids as $jid) {
+                $stmt_insert->bind_param("ii", $student_id, $jid);
+                $stmt_insert->execute();
+            }
+            $stmt_insert->close();
+        } else {
+             // If manual list empty, assume user wants to use STANDARD persistence or just removed manual entries?
+             // If user UNCHECKS everything, we should probably delete the manual entries so it reverts to automatic.
+             // Assumption: Submit with empty checkboxes = Revert to Automatic.
+             $conn->query("DELETE FROM mahasiswa_jadwal WHERE mahasiswa_id = $student_id");
+        }
+
         // Fetch current status
         $check_status = $conn->query("SELECT status_keuangan FROM mahasiswa WHERE id = $student_id")->fetch_assoc();
         $status = $check_status['status_keuangan'];
 
         if ($status == 'LUNAS' || $status == 'DISPENSASI') {
+            // Redirect WITHOUT jadwal_ids parameter, as we rely on DB now
             header("Location: print_card.php?id=" . $student_id);
             exit;
         } else {
@@ -73,6 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Fetch Prodis for dropdown
 try {
     $prodis = $conn->query("SELECT * FROM prodi");
+    // Fetch Distinct Semesters
+    $semesters_res = $conn->query("SELECT DISTINCT semester FROM jadwal_uas ORDER BY semester ASC");
 } catch (Exception $e) {
     die("Database Error: " . $e->getMessage());
 }
@@ -86,10 +147,12 @@ try {
         <p class="text-gray-600">Silakan lengkapi data diri Anda untuk mencetak kartu.</p>
     </div>
     
+    <?= $message ?>
+    
     <form action="" method="POST" class="space-y-4">
         <div>
             <label class="block text-gray-700 font-bold mb-2">Program Studi</label>
-            <select name="prodi_id" required class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
+            <select name="prodi_id" id="prodi_id" required class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
                 <option value="">-- Pilih Prodi --</option>
                 <?php while($row = $prodis->fetch_assoc()): ?>
                     <option value="<?= $row['id'] ?>"><?= $row['nama_prodi'] ?></option>
@@ -109,7 +172,21 @@ try {
 
         <div>
             <label class="block text-gray-700 font-bold mb-2">Semester</label>
-            <input type="number" name="semester" min="1" max="14" required placeholder="Semester Saat Ini" class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
+            <select name="semester" id="semester" required class="w-full border border-gray-300 p-2 rounded focus:outline-none focus:border-blue-500">
+                <option value="">-- Pilih Semester --</option>
+                <?php while($row = $semesters_res->fetch_assoc()): ?>
+                    <option value="<?= $row['semester'] ?>"><?= $row['semester'] ?></option>
+                <?php endwhile; ?>
+            </select>
+        </div>
+        
+        <!-- Schedule Selection Area -->
+        <div id="schedule-container" class="hidden">
+            <label class="block text-gray-700 font-bold mb-2">Pilih Mata Kuliah (Opsional, jika Manual)</label>
+            <div id="schedule-list" class="border border-gray-300 p-2 rounded max-h-60 overflow-y-auto space-y-2">
+                <!-- Checkboxes loaded via AJAX -->
+            </div>
+            <p class="text-xs text-gray-500 mt-1">*Centang mata kuliah yang diambil jika jadwal tidak otomatis.</p>
         </div>
 
         <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 transition flex items-center justify-center gap-2">
@@ -120,5 +197,61 @@ try {
         </button>
     </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const prodiSelect = document.getElementById('prodi_id');
+    const semesterSelect = document.getElementById('semester');
+    const scheduleContainer = document.getElementById('schedule-container');
+    const scheduleList = document.getElementById('schedule-list');
+
+    function fetchSchedules() {
+        const prodiId = prodiSelect.value;
+        const semester = semesterSelect.value;
+
+        if (!prodiId) {
+            scheduleContainer.classList.add('hidden');
+            return;
+        }
+
+        // URL to fetch schedules
+        let url = `student_print.php?action=get_schedules&prodi_id=${prodiId}`;
+        if (semester) {
+            url += `&semester=${encodeURIComponent(semester)}`;
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                scheduleList.innerHTML = '';
+                if (data.length > 0) {
+                    scheduleContainer.classList.remove('hidden');
+                    data.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-start gap-2';
+                        // Clean date format if needed or use raw
+                        div.innerHTML = `
+                            <input type="checkbox" name="jadwal_ids[]" value="${item.id}" id="j_${item.id}" class="mt-1">
+                            <label for="j_${item.id}" class="text-sm cursor-pointer">
+                                <span class="font-bold">${item.kode_matkul} - ${item.nama_matkul}</span><br>
+                                <span class="text-xs text-gray-500">${item.semester} | ${item.waktu}</span>
+                            </label>
+                        `;
+                        scheduleList.appendChild(div);
+                    });
+                } else if (semester) {
+                    // If semester selected but no data, maybe show message or nothing
+                    scheduleList.innerHTML = '<p class="text-sm text-gray-500">Tidak ada jadwal ditemukan.</p>';
+                } else {
+                     scheduleContainer.classList.add('hidden');
+                }
+            })
+            .catch(err => console.error(err));
+    }
+
+    prodiSelect.addEventListener('change', fetchSchedules);
+    semesterSelect.addEventListener('change', fetchSchedules);
+});
+</script>
 
 <?php include 'footer.php'; ?>
