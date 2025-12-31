@@ -14,6 +14,21 @@ if (isset($_GET['delete'])) {
     }
 }
 
+// Handle Status Update (Admin Verification)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
+    $id = $_POST['student_id'];
+    $status = $_POST['status_keuangan'];
+    $catatan = $_POST['catatan_keuangan'];
+
+    $stmt = $conn->prepare("UPDATE mahasiswa SET status_keuangan = ?, catatan_keuangan = ? WHERE id = ?");
+    $stmt->bind_param("ssi", $status, $catatan, $id);
+    $stmt->execute();
+    $stmt->close();
+    // Redirect to avoid resubmission
+    header("Location: " . $_SERVER['REQUEST_URI']);
+    exit;
+}
+
 // Params Filter
 $filter_prodi = $_GET['prodi'] ?? '';
 $filter_semester = $_GET['semester'] ?? '';
@@ -109,8 +124,7 @@ $prodis = $conn->query("SELECT * FROM prodi");
                     <th class="p-3 border-b">Nama Mahasiswa</th>
                     <th class="p-3 border-b">Prodi</th>
                     <th class="p-3 border-b">Sem</th>
-                    <th class="p-3 border-b">Status Keuangan</th>
-                    <th class="p-3 border-b">Catatan</th>
+                    <th class="p-3 border-b" style="width: 250px;">Verifikasi Keuangan</th>
                     <th class="p-3 border-b text-center">Aksi</th>
                 </tr>
             </thead>
@@ -124,20 +138,22 @@ $prodis = $conn->query("SELECT * FROM prodi");
                         <td class="p-3 text-gray-600"><?= htmlspecialchars($row['nama_prodi']) ?></td>
                         <td class="p-3"><?= $row['semester'] ?></td>
                         <td class="p-3">
-                            <?php 
-                                $status_color = match($row['status_keuangan']) {
-                                    'LUNAS' => 'bg-green-100 text-green-800',
-                                    'DISPENSASI' => 'bg-orange-100 text-orange-800',
-                                    default => 'bg-red-100 text-red-800'
-                                };
-                            ?>
-                            <span class="px-2 py-1 rounded-full text-xs font-semibold <?= $status_color ?>">
-                                <?= $row['status_keuangan'] ?>
-                            </span>
+                            <form method="POST" class="flex flex-col gap-1">
+                                <input type="hidden" name="student_id" value="<?= $row['id'] ?>">
+                                <input type="hidden" name="update_status" value="1">
+                                
+                                <select name="status_keuangan" class="border p-1 rounded text-xs w-full" onchange="this.form.submit()">
+                                    <option value="BELUM_LUNAS" <?= $row['status_keuangan'] == 'BELUM_LUNAS' ? 'selected' : '' ?>>Belum Lunas</option>
+                                    <option value="LUNAS" <?= $row['status_keuangan'] == 'LUNAS' ? 'selected' : '' ?>>Lunas</option>
+                                    <option value="DISPENSASI" <?= $row['status_keuangan'] == 'DISPENSASI' ? 'selected' : '' ?>>Dispensasi</option>
+                                </select>
+                                <div class="flex gap-1">
+                                    <input type="text" name="catatan_keuangan" value="<?= htmlspecialchars($row['catatan_keuangan'] ?? '') ?>" placeholder="Catatan..." class="border p-1 rounded text-xs w-full">
+                                    <button type="submit" class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">ok</button>
+                                </div>
+                            </form>
                         </td>
-                        <td class="p-3 text-gray-500 italic"><?= htmlspecialchars($row['catatan_keuangan'] ?? '-') ?></td>
                         <td class="p-3 text-center space-x-2">
-                            <!-- Edit Button could be added here if edit page exists -->
                              <a href="data_mahasiswa.php?delete=<?= $row['id'] ?>" onclick="return confirm('Yakin ingin menghapus data ini?')" 
                                 class="text-red-600 hover:text-red-900" title="Hapus">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
